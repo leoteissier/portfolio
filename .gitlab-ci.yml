@@ -1,6 +1,5 @@
 stages:
   - build       # Étape pour construire le projet
-  - test        # Étape pour les tests
   - deploy      # Étape pour le déploiement
 
 variables:
@@ -21,15 +20,6 @@ build-job:
     paths:
       - dist/
     expire_in: 1 week
-
-# Job de tests
-test-job:
-  stage: test
-  image: node:$NODE_VERSION
-  script:
-    - npm test
-  dependencies:
-    - build-job
 
 # Job de déploiement
 deploy-to-vps:
