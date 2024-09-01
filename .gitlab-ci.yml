@@ -1,40 +1,43 @@
 stages:
-  - build       # Étape pour construire le projet
-  - deploy      # Étape pour le déploiement
+  - build
+  - deploy
 
 variables:
   NODE_VERSION: "22"
 
 before_script:
   - apt-get update -y
-  - apt-get install -y openssh-client
+  - apt-get install -y openssh-client  # Nécessaire pour les connexions SSH
 
 # Job de construction
 build-job:
   stage: build
   image: node:$NODE_VERSION
   script:
-    - npm install
-    - npm run generate
+    - npm install  # Installation des dépendances
+    - npm run generate  # Génération des fichiers du site
+    - ls -la dist/  # Vérification du contenu généré pour débogage
   artifacts:
     paths:
-      - dist/
+      - dist/  # Sauvegarder les fichiers générés pour le déploiement
     expire_in: 1 week
 
-# Job de déploiement
+# Job de déploiement sur le VPS
 deploy-to-vps:
   stage: deploy
   only:
-    - main  # Exécute ce job seulement pour la branche `main`
+    - main
   script:
-    - mkdir -p ~/.ssh
-    - echo "$VPS_SSH_KEY" > ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts
-    - ssh -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST "sudo rm -rf /var/www/portfolio/*"
-    - scp -o StrictHostKeyChecking=no -r dist/* $VPS_USER@$VPS_HOST:/var/www/portfolio/
+    - mkdir -p ~/.ssh  # Crée le répertoire .ssh si inexistant
+    - echo "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/id_rsa  # Ajoute la clé SSH depuis la variable d'environnement
+    - chmod 600 ~/.ssh/id_rsa  # Assure des permissions sécurisées pour la clé privée
+    - ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts  # Ajoute le VPS aux hôtes connus pour éviter les avertissements SSH
+    - if [ -z "$(ls -A dist)" ]; then echo "Le répertoire dist est vide. Annulation du déploiement."; exit 1; fi  # Vérification avant déploiement
+    - ssh -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST "sudo rm -rf /var/www/portfolio/*"  # Supprime le contenu existant
+    - scp -o StrictHostKeyChecking=no -r dist/* $VPS_USER@$VPS_HOST:/var/www/portfolio/  # Copie les nouveaux fichiers
   dependencies:
     - build-job
   environment:
     name: production
     url: http://$VPS_HOST
+
