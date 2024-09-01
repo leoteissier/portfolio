@@ -7,37 +7,40 @@ variables:
 
 before_script:
   - apt-get update -y
-  - apt-get install -y openssh-client  # Nécessaire pour les connexions SSH
+  - apt-get install -y openssh-client
 
-# Job de construction
 build-job:
   stage: build
   image: node:$NODE_VERSION
   script:
-    - npm install  # Installation des dépendances
-    - npm run generate  # Génération des fichiers du site
-    - ls -la dist/  # Vérification du contenu généré pour débogage
+    - npm install
+    - npm run generate
+    - ls -la dist/  # Vérification du contenu généré
   artifacts:
     paths:
-      - dist/  # Sauvegarder les fichiers générés pour le déploiement
+      - dist/
     expire_in: 1 week
 
-# Job de déploiement sur le VPS
 deploy-to-vps:
   stage: deploy
   only:
     - main
   script:
-    - mkdir -p ~/.ssh  # Crée le répertoire .ssh si inexistant
-    - echo "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/id_rsa  # Ajoute la clé SSH depuis la variable d'environnement
-    - chmod 600 ~/.ssh/id_rsa  # Assure des permissions sécurisées pour la clé privée
-    - ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts  # Ajoute le VPS aux hôtes connus pour éviter les avertissements SSH
-    - if [ -z "$(ls -A dist)" ]; then echo "Le répertoire dist est vide. Annulation du déploiement."; exit 1; fi  # Vérification avant déploiement
-    - ssh -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST "sudo rm -rf /var/www/portfolio/*"  # Supprime le contenu existant
-    - scp -o StrictHostKeyChecking=no -r dist/* $VPS_USER@$VPS_HOST:/var/www/portfolio/  # Copie les nouveaux fichiers
+    - mkdir -p ~/.ssh
+    - echo "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts
+    - ls -la  # Affiche le contenu du répertoire de travail
+    - ls -la dist/  # Affiche le contenu du répertoire dist/ pour confirmer la présence des fichiers
+    - if [ -z "$(ls -A dist)" ]; then echo "Le répertoire dist est vide. Annulation du déploiement."; exit 1; fi
+    - cd $CI_PROJECT_DIR  # Changer le répertoire de travail pour s'assurer qu'il est correct
+    - ssh -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST "sudo rm -rf /var/www/portfolio/*"
+    - scp -o StrictHostKeyChecking=no -r ./dist/* $VPS_USER@$VPS_HOST:/var/www/portfolio/
   dependencies:
     - build-job
+  artifacts:
+    paths:
+      - dist/
   environment:
     name: production
     url: http://$VPS_HOST
-
