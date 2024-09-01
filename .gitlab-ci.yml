@@ -15,7 +15,7 @@ build-job:
   script:
     - npm install
     - npm run generate
-    - ls -la dist/  # Vérification du contenu généré
+    - ls -la .output/public
   artifacts:
     paths:
       - dist/
@@ -30,12 +30,16 @@ deploy-to-vps:
     - echo "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
     - ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts
-    - ls -la /builds/leoteissier/portfolio/.output/public  # Vérifiez le contenu réel du répertoire de sortie
-    - if [ -z "$(ls -A /builds/leoteissier/portfolio/.output/public)" ]; then echo "Le répertoire public est vide. Annulation du déploiement."; exit 1; fi
+    - ls -la  # Vérification du répertoire de travail actuel
+    - ls -la .output/public  # Vérification du contenu réel du répertoire généré
+    - if [ -z "$(ls -A .output/public)" ]; then echo "Le répertoire public est vide. Annulation du déploiement."; exit 1; fi
     - ssh -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST "sudo rm -rf /var/www/portfolio/*"
-    - scp -o StrictHostKeyChecking=no -r /builds/leoteissier/portfolio/.output/public/* $VPS_USER@$VPS_HOST:/var/www/portfolio/
+    - scp -o StrictHostKeyChecking=no -r .output/public/* $VPS_USER@$VPS_HOST:/var/www/portfolio/
   dependencies:
     - build-job
+  artifacts:
+    paths:
+      - .output/public
   environment:
     name: production
     url: http://$VPS_HOST
