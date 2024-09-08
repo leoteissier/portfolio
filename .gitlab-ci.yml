@@ -4,11 +4,10 @@ stages:
 
 # Variables for Docker, SSH, and the VPS
 variables:
-  DOCKER_IMAGE: "portfolio:latest"
+  DOCKER_IMAGE_PROD: "portfolio-app-prod"
   VPS_USER: $VPS_USER
   VPS_HOST: $VPS_HOST
   VPS_PATH: "/var/www"
-  DOCKER_IMAGE_PROD: "portfolio-app-prod"
 
 build_job:
   stage: build
@@ -16,9 +15,9 @@ build_job:
   services:
     - docker:dind
   script:
-    # Construire l'image avec le Dockerfile de production
+    # Construire l'image Docker avec le Dockerfile de production
     - docker build -f Dockerfile.prod -t $DOCKER_IMAGE_PROD .
-    # Sauvegarder l'image construite avec docker save
+    # Sauvegarder l'image en un fichier compressé
     - docker save $DOCKER_IMAGE_PROD | gzip > portfolio.tar.gz
   artifacts:
     paths:
@@ -27,7 +26,7 @@ build_job:
 deploy_job:
   stage: deploy
   before_script:
-    # Set up SSH key using $VPS_SSH_KEY
+    # Setup SSH key for remote server access
     - 'which ssh-agent || ( apk add --update openssh )'
     - eval $(ssh-agent -s)
     - echo "$VPS_SSH_KEY" | tr -d '\r' | ssh-add -
@@ -35,9 +34,19 @@ deploy_job:
     - chmod 700 ~/.ssh
     - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
   script:
-    # Copier l'image sur le serveur
+    # Supprimer le fichier portfolio.tar.gz existant sur le VPS
+    - ssh $VPS_USER@$VPS_HOST "rm -f $VPS_PATH/portfolio.tar.gz"
+    
+    # Copier le fichier image Docker sur le VPS
     - scp portfolio.tar.gz $VPS_USER@$VPS_HOST:$VPS_PATH
-    # Se connecter au VPS et charger l'image Docker
-    - ssh $VPS_USER@$VPS_HOST "cd $VPS_PATH && docker load -i portfolio.tar.gz"
-    # Déployer le nouveau conteneur sur le VPS
-    - ssh $VPS_USER@$VPS_HOST "docker stop portfolio || true && docker rm portfolio || true && docker run -d --name portfolio -p 3000:3000 $DOCKER_IMAGE_PROD"
+
+    # Charger la nouvelle image Docker sur le VPS
+    - ssh $VPS_USER@$VPS_HOST "docker load -i $VPS_PATH/portfolio.tar.gz"
+
+    # Arrêter et supprimer le conteneur existant s'il est en cours d'exécution
+    - ssh $VPS_USER@$VPS_HOST "docker stop portfolio || true && docker rm portfolio || true"
+
+    # Démarrer un nouveau conteneur avec la nouvelle image
+    - ssh $VPS_USER@$VPS_HOST "docker run -d --name portfolio -p 3000:3000 $DOCKER_IMAGE_PROD"
+  only:
+    - main  # Exécuté uniquement lors d'un push sur la branche main
