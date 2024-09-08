@@ -37,4 +37,4 @@ deploy_job:
     # Connect to the VPS and load the Docker image
     - ssh $VPS_USER@$VPS_HOST "cd $VPS_PATH && docker load -i portfolio.tar.gz"
     # Deploy the new container on the VPS
-    - ssh $VPS_USER@$VPS_HOST "cd $VPS_PATH && docker-compose down && docker-compose up -d"
+    - ssh $VPS_USER@$VPS_HOST "docker stop portfolio || true && docker rm portfolio || true && docker run -d --name portfolio -p 3000:3000 $DOCKER_IMAGE"
