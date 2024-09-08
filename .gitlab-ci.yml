@@ -2,41 +2,39 @@ stages:
   - build
   - deploy
 
+# Variables for Docker, SSH, and the VPS
 variables:
-  NODE_VERSION: "22"
+  DOCKER_IMAGE: "portfolio:latest"
+  VPS_USER: $VPS_USER
+  VPS_HOST: $VPS_HOST
+  VPS_PATH: "/var/www"
 
-before_script:
-  - apt-get update -y
-  - apt-get install -y openssh-client
-
-build-job:
+build_job:
   stage: build
-  image: node:$NODE_VERSION
+  image: docker:latest
+  services:
+    - docker:dind
   script:
-    - npm install
-    - npm run generate
-    - ls -la dist/
+    - docker build -t $DOCKER_IMAGE -f docker/Dockerfile .
+    - docker save $DOCKER_IMAGE | gzip > portfolio.tar.gz
   artifacts:
     paths:
-      - dist/
-    expire_in: 1 week
+      - portfolio.tar.gz
 
-deploy-to-vps:
+deploy_job:
   stage: deploy
-  only:
-    - main
-  script:
+  before_script:
+    # Set up SSH key using $VPS_SSH_KEY
+    - 'which ssh-agent || ( apk add --update openssh )'
+    - eval $(ssh-agent -s)
+    - echo "$VPS_SSH_KEY" | tr -d '\r' | ssh-add -
     - mkdir -p ~/.ssh
-    - echo "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts
-    - ls -la  # Vérification du répertoire de travail actuel
-    - ls -la dist/  # Vérification du contenu du répertoire dist pour confirmer la présence des fichiers
-    - if [ -z "$(ls -A dist)" ]; then echo "Le répertoire dist est vide. Annulation du déploiement."; exit 1; fi
-    - ssh -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST "sudo rm -rf /var/www/portfolio/*"
-    - scp -o StrictHostKeyChecking=no -r dist/* $VPS_USER@$VPS_HOST:/var/www/portfolio/
-  dependencies:
-    - build-job
-  environment:
-    name: production
-    url: http://$VPS_HOST
+    - chmod 700 ~/.ssh
+    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+  script:
+    # Copy the image to the server
+    - scp portfolio.tar.gz $VPS_USER@$VPS_HOST:$VPS_PATH
+    # Connect to the VPS and load the Docker image
+    - ssh $VPS_USER@$VPS_HOST "cd $VPS_PATH && docker load -i portfolio.tar.gz"
+    # Deploy the new container on the VPS
+    - ssh $VPS_USER@$VPS_HOST "cd $VPS_PATH && docker-compose down && docker-compose up -d"
