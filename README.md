@@ -25,7 +25,7 @@ cd portfolio
 3. Build the Docker container
 
 ```bash
-sudo docker build -t portfolio-app -f docker/Dockerfile .
+sudo docker build -t portfolio-app .
 ```
 
 4. Start the container
