@@ -16,8 +16,10 @@ build_job:
   services:
     - docker:dind
   script:
+    # Construire l'image avec le Dockerfile de production
     - docker build -f Dockerfile.prod -t $DOCKER_IMAGE_PROD .
-    - docker save $DOCKER_IMAGE | gzip > portfolio.tar.gz
+    # Sauvegarder l'image construite avec docker save
+    - docker save $DOCKER_IMAGE_PROD | gzip > portfolio.tar.gz
   artifacts:
     paths:
       - portfolio.tar.gz
@@ -33,9 +35,9 @@ deploy_job:
     - chmod 700 ~/.ssh
     - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
   script:
-    # Copy the image to the server
+    # Copier l'image sur le serveur
     - scp portfolio.tar.gz $VPS_USER@$VPS_HOST:$VPS_PATH
-    # Connect to the VPS and load the Docker image
+    # Se connecter au VPS et charger l'image Docker
     - ssh $VPS_USER@$VPS_HOST "cd $VPS_PATH && docker load -i portfolio.tar.gz"
-    # Deploy the new container on the VPS
-    - ssh $VPS_USER@$VPS_HOST "docker stop portfolio || true && docker rm portfolio || true && docker run -d --name portfolio -p 3000:3000 $DOCKER_IMAGE"
+    # Déployer le nouveau conteneur sur le VPS
+    - ssh $VPS_USER@$VPS_HOST "docker stop portfolio || true && docker rm portfolio || true && docker run -d --name portfolio -p 3000:3000 $DOCKER_IMAGE_PROD"
