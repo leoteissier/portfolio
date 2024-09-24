@@ -36,6 +36,7 @@ export default defineNuxtConfig({
                 { name: 'theme-color', content: '#010C15' },
             ],
         },
+        baseURL: '/',
     },
 
     devtools: {
