@@ -176,8 +176,8 @@ function fadeDelay(key: number) {
                     work-in-progress
                   </p>
 
-                  <a v-if="project.github" :href="project.github" target="_blank" class="bg-[#1E2D3D] hover:bg-[#4D5BCE] text-white py-2 px-4 w-fit rounded-lg ml-2">
-                    view-github
+                  <a v-if="project.gitlab" :href="project.gitlab" target="_blank" class="bg-[#1E2D3D] hover:bg-[#4D5BCE] text-white py-2 px-4 w-fit rounded-lg ml-2">
+                    view-gitlab
                   </a>
                 </div>
               </div>
